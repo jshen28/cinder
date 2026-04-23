@@ -3382,6 +3382,7 @@ def volume_has_snapshots_in_a_cgsnapshot_filter():
     return sql.exists().where(
         and_(
             models.Volume.id == models.Snapshot.volume_id,
+            ~models.Snapshot.deleted,
             models.Snapshot.cgsnapshot_id.isnot(None),
         )
     )
@@ -3468,6 +3469,7 @@ def volume_has_other_project_snp_filter():
         and_(
             models.Volume.id == models.Snapshot.volume_id,
             models.Volume.project_id != models.Snapshot.project_id,
+            ~models.Snapshot.deleted,
         )
     )
 

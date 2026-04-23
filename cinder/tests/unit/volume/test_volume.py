@@ -3425,6 +3425,76 @@ class VolumeTestCase(base.BaseVolumeTestCase):
                           volume,
                           cascade=True)
 
+    @mock.patch('cinder.utils.api_clean_volume_file_locks')
+    def test_cascade_delete_volume_with_snapshots_in_other_project_by_admin(
+            self, mock_api_clean):
+        """Test admin can cascade delete volume with snapshots in other
+        project.
+        """
+        volume = tests_utils.create_volume(self.context,
+                                           **self.volume_params)
+        volume['status'] = 'available'
+        volume['host'] = 'fakehost'
+        db.volume_update(self.context, volume['id'], {'status': 'available'})
+        snapshot = create_snapshot(volume['id'], size=volume['size'],
+                                   project_id=fake.PROJECT2_ID)
+        self.volume.create_snapshot(self.context, snapshot)
+        self.assertEqual(
+            snapshot.id, objects.Snapshot.get_by_id(self.context,
+                                                    snapshot.id).id)
+
+        self.volume_api.delete(self.context,
+                          volume,
+                          cascade=True)
+        mock_api_clean.assert_called_once_with(volume.id)
+
+    @mock.patch('cinder.utils.api_clean_volume_file_locks')
+    def test_cascade_delete_volume_with_snapshots_same_project(
+            self, mock_api_clean):
+        """Test non-admin can cascade delete volume with same project
+        snapshots.
+        """
+        volume = tests_utils.create_volume(self.user_context,
+                                           **self.volume_params)
+        volume['status'] = 'available'
+        volume['host'] = 'fakehost'
+        db.volume_update(self.context, volume['id'], {'status': 'available'})
+        snapshot = create_snapshot(volume['id'], size=volume['size'])
+        self.volume.create_snapshot(self.context, snapshot)
+        self.assertEqual(
+            snapshot.id, objects.Snapshot.get_by_id(self.context,
+                                                    snapshot.id).id)
+
+        self.volume_api.delete(self.user_context,
+                          volume,
+                          cascade=True)
+        mock_api_clean.assert_called_once_with(volume.id)
+
+    @mock.patch('cinder.utils.api_clean_volume_file_locks')
+    def test_cascade_delete_volume_with_deleted_snapshots_in_other_project(
+            self, mock_api_clean):
+        """Test non-admin can cascade delete volume with deleted snapshots
+        in other project.
+        """
+        volume = tests_utils.create_volume(self.user_context,
+                                           **self.volume_params)
+        volume['status'] = 'available'
+        volume['host'] = 'fakehost'
+        db.volume_update(self.context, volume['id'], {'status': 'available'})
+        snapshot = create_snapshot(volume['id'], size=volume['size'],
+                                   project_id=fake.PROJECT2_ID)
+        self.volume.create_snapshot(self.context, snapshot)
+        self.assertEqual(
+            snapshot.id, objects.Snapshot.get_by_id(self.context,
+                                                    snapshot.id).id)
+
+        db.snapshot_update(self.context, snapshot.id, {'deleted': True})
+
+        self.volume_api.delete(self.user_context,
+                          volume,
+                          cascade=True)
+        mock_api_clean.assert_called_once_with(volume.id)
+
     @mock.patch.object(driver.BaseVD, 'get_backup_device')
     @mock.patch.object(driver.BaseVD, 'secure_file_operations_enabled')
     def test_get_backup_device(self, mock_secure, mock_get_backup):

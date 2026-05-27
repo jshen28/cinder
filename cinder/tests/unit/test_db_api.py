@@ -1438,6 +1438,73 @@ class DBAPIVolumeTestCase(BaseTest):
         self.assertRaises(exception.VolumeNotFound, db.volume_update,
                           self.ctxt, 42, {})
 
+    def test_volume_has_snapshots_in_a_cgsnapshot_filter(self):
+        cg = utils.create_consistencygroup(self.ctxt)
+        vol1 = utils.create_volume(self.ctxt,
+                                   consistencygroup_id=cg.id)
+        vol2 = utils.create_volume(self.ctxt,
+                                   consistencygroup_id=cg.id)
+
+        # No snapshots, neither volume should match
+        with sqlalchemy_api.main_context_manager.reader.using(self.ctxt):
+            query = sqlalchemy_api.model_query(
+                self.ctxt, models.Volume
+            ).filter(
+                sqlalchemy_api.volume_has_snapshots_in_a_cgsnapshot_filter())
+            self.assertEqual([], query.all())
+
+        # Create a regular snapshot (not in a cgsnapshot) for vol1
+        db.snapshot_create(self.ctxt,
+                           {'volume_id': vol1.id,
+                            'volume_type_id': fake.VOLUME_TYPE_ID})
+
+        # Still no match because snapshot is not in a cgsnapshot
+        with sqlalchemy_api.main_context_manager.reader.using(self.ctxt):
+            query = sqlalchemy_api.model_query(
+                self.ctxt, models.Volume
+            ).filter(
+                sqlalchemy_api.volume_has_snapshots_in_a_cgsnapshot_filter())
+            self.assertEqual([], query.all())
+
+        # Create a cgsnapshot and snapshots in it for vol1 and vol2
+        cgsnap = db.cgsnapshot_create(
+            self.ctxt,
+            {'consistencygroup_id': cg.id}
+        )
+        snap1 = db.snapshot_create(
+            self.ctxt,
+            {'volume_id': vol1.id,
+             'cgsnapshot_id': cgsnap.id,
+             'volume_type_id': fake.VOLUME_TYPE_ID})
+        snap2 = db.snapshot_create(
+            self.ctxt,
+            {'volume_id': vol2.id,
+             'cgsnapshot_id': cgsnap.id,
+             'volume_type_id': fake.VOLUME_TYPE_ID})
+
+        # Now both vol1 and vol2 should match
+        with sqlalchemy_api.main_context_manager.reader.using(self.ctxt):
+            query = sqlalchemy_api.model_query(
+                self.ctxt, models.Volume
+            ).filter(
+                sqlalchemy_api.volume_has_snapshots_in_a_cgsnapshot_filter())
+            result = query.all()
+        self.assertEqual(2, len(result))
+        for vid in [vol1.id, vol2.id]:
+            self.assertIn(vid, [r.id for r in result])
+
+        # Destroy the snapshots that belong to the cgsnapshot
+        db.snapshot_destroy(self.ctxt, snap1.id)
+        db.snapshot_destroy(self.ctxt, snap2.id)
+
+        # After deletion, no volume should match
+        with sqlalchemy_api.main_context_manager.reader.using(self.ctxt):
+            query = sqlalchemy_api.model_query(
+                self.ctxt, models.Volume
+            ).filter(
+                sqlalchemy_api.volume_has_snapshots_in_a_cgsnapshot_filter())
+            self.assertEqual([], query.all())
+
     def test_volume_metadata_get(self):
         metadata = {'a': 'b', 'c': 'd'}
         db.volume_create(self.ctxt, {'id': 1, 'metadata': metadata,

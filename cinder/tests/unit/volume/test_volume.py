@@ -3428,9 +3428,6 @@ class VolumeTestCase(base.BaseVolumeTestCase):
     @mock.patch('cinder.utils.api_clean_volume_file_locks')
     def test_cascade_delete_volume_with_snapshots_in_other_project_by_admin(
             self, mock_api_clean):
-        """Test admin can cascade delete volume with snapshots in other
-        project.
-        """
         volume = tests_utils.create_volume(self.context,
                                            **self.volume_params)
         volume['status'] = 'available'
@@ -3444,16 +3441,13 @@ class VolumeTestCase(base.BaseVolumeTestCase):
                                                     snapshot.id).id)
 
         self.volume_api.delete(self.context,
-                          volume,
-                          cascade=True)
+                               volume,
+                               cascade=True)
         mock_api_clean.assert_called_once_with(volume.id)
 
     @mock.patch('cinder.utils.api_clean_volume_file_locks')
     def test_cascade_delete_volume_with_snapshots_same_project(
             self, mock_api_clean):
-        """Test non-admin can cascade delete volume with same project
-        snapshots.
-        """
         volume = tests_utils.create_volume(self.user_context,
                                            **self.volume_params)
         volume['status'] = 'available'
@@ -3466,16 +3460,13 @@ class VolumeTestCase(base.BaseVolumeTestCase):
                                                     snapshot.id).id)
 
         self.volume_api.delete(self.user_context,
-                          volume,
-                          cascade=True)
+                               volume,
+                               cascade=True)
         mock_api_clean.assert_called_once_with(volume.id)
 
     @mock.patch('cinder.utils.api_clean_volume_file_locks')
     def test_cascade_delete_volume_with_deleted_snapshots_in_other_project(
             self, mock_api_clean):
-        """Test non-admin can cascade delete volume with deleted snapshots
-        in other project.
-        """
         volume = tests_utils.create_volume(self.user_context,
                                            **self.volume_params)
         volume['status'] = 'available'
@@ -3491,8 +3482,8 @@ class VolumeTestCase(base.BaseVolumeTestCase):
         db.snapshot_update(self.context, snapshot.id, {'deleted': True})
 
         self.volume_api.delete(self.user_context,
-                          volume,
-                          cascade=True)
+                               volume,
+                               cascade=True)
         mock_api_clean.assert_called_once_with(volume.id)
 
     @mock.patch.object(driver.BaseVD, 'get_backup_device')

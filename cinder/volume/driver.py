@@ -1434,6 +1434,8 @@ class BaseVD(object, metaclass=abc.ABCMeta):
         try:
             model_update = self.create_volume_from_snapshot(temp_vol_ref,
                                                             snapshot)
+            if 'snapshot_id' not in model_update:
+                model_update['snapshot_id'] = snapshot.id
             if model_update:
                 temp_vol_ref.update(model_update)
         except Exception:
